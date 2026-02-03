@@ -15,8 +15,8 @@ from app.services.quality_service import QualityService
 from app.services.embedding_service import EmbeddingService
 from app.services.constitution_service import ConstitutionService
 
-# 导入生成的 protobuf 代码 (需要先编译 proto 文件)
-# from app.proto import ai_service_pb2, ai_service_pb2_grpc
+# 导入生成的 protobuf 代码
+from app.proto import ai_service_pb2, ai_service_pb2_grpc
 
 logger = structlog.get_logger()
 
@@ -459,10 +459,10 @@ async def serve_grpc():
         ],
     )
 
-    # 注册服务 (需要先编译 proto 文件)
-    # ai_service_pb2_grpc.add_AIServiceServicer_to_server(
-    #     AIServiceServicer(), server
-    # )
+    # 注册服务
+    ai_service_pb2_grpc.add_AIServiceServicer_to_server(
+        AIServiceServicer(), server
+    )
 
     listen_addr = f"[::]:{settings.grpc_port}"
 
