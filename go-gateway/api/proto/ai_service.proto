@@ -1,0 +1,96 @@
+syntax = "proto3";
+package ai;
+
+option go_package = "go-gateway/api/proto/ai";
+
+// AI 服务
+service AIService {
+    // 流式文本生成
+    rpc GenerateStream(GenerateRequest) returns (stream GenerateResponse);
+
+    // RAG 检索
+    rpc RetrieveContext(RetrieveRequest) returns (RetrieveResponse);
+
+    // 内容分析
+    rpc AnalyzeContent(AnalyzeRequest) returns (AnalyzeResponse);
+
+    // 质量评估
+    rpc EvaluateQuality(EvaluateRequest) returns (EvaluateResponse);
+}
+
+// 生成请求
+message GenerateRequest {
+    string prompt = 1;
+    string model = 2;
+    string provider = 3;
+    float temperature = 4;
+    int32 max_tokens = 5;
+    string system_prompt = 6;
+    string user_id = 7;
+    string project_id = 8;
+}
+
+// 生成响应
+message GenerateResponse {
+    string content = 1;
+    bool done = 2;
+    string error = 3;
+}
+
+// 检索请求
+message RetrieveRequest {
+    string project_id = 1;
+    string query = 2;
+    int32 top_k = 3;
+    repeated string layers = 4;
+}
+
+// 检索响应
+message RetrieveResponse {
+    string query = 1;
+    map<string, LayerResults> results = 2;
+    int32 total_tokens = 3;
+}
+
+message LayerResults {
+    repeated RetrievedItem items = 1;
+}
+
+message RetrievedItem {
+    string content = 1;
+    float score = 2;
+    string source_id = 3;
+    string source_type = 4;
+}
+
+// 分析请求
+message AnalyzeRequest {
+    string project_id = 1;
+    string chapter_id = 2;
+    string content = 3;
+}
+
+// 分析响应
+message AnalyzeResponse {
+    map<string, string> analysis = 1;
+}
+
+// 质量评估请求
+message EvaluateRequest {
+    string project_id = 1;
+    string chapter_id = 2;
+    string content = 3;
+    repeated string checkers = 4;
+}
+
+// 质量评估响应
+message EvaluateResponse {
+    float overall_score = 1;
+    map<string, CheckerResult> results = 2;
+}
+
+message CheckerResult {
+    float score = 1;
+    repeated string issues = 2;
+    repeated string suggestions = 3;
+}

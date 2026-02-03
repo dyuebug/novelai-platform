@@ -1,0 +1,59 @@
+# Dependencies
+node_modules/
+vendor/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Build outputs
+dist/
+build/
+*.exe
+bin/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+*.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Certificates (development)
+certs/
+*.pem
+*.key
+*.crt
+*.csr
+
+# Database
+*.db
+*.sqlite
+
+# Test coverage
+coverage/
+.coverage
+htmlcov/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Generated protobuf
+*_pb2.py
+*_pb2_grpc.py
+*.pb.go

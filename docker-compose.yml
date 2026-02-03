@@ -1,0 +1,127 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with pgvector
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: novelai-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: novelai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: novelai-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Go Gateway
+  gateway:
+    build:
+      context: ./go-gateway
+      dockerfile: Dockerfile
+    container_name: novelai-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_ADDR=:8080
+      - DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/novelai?sslmode=disable
+      - REDIS_ADDR=redis:6379
+      - GRPC_AI_SERVICE_ADDR=ai-service:50051
+      - JWT_PRIVATE_KEY_PATH=/app/keys/private.pem
+      - JWT_PUBLIC_KEY_PATH=/app/keys/public.pem
+    volumes:
+      - ./keys:/app/keys:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Python AI Service
+  ai-service:
+    build:
+      context: ./python-ai-service
+      dockerfile: Dockerfile
+    container_name: novelai-ai-service
+    ports:
+      - "8001:8001"
+      - "50051:50051"
+    environment:
+      - HTTP_PORT=8001
+      - GRPC_PORT=50051
+      - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/novelai
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - DEFAULT_PROVIDER=${DEFAULT_PROVIDER:-openai}
+      - DEFAULT_MODEL=${DEFAULT_MODEL:-gpt-4o}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: novelai-frontend
+    ports:
+      - "80:80"
+    environment:
+      - VITE_API_BASE_URL=http://gateway:8080
+    depends_on:
+      - gateway
+
+  # Database Migration (one-time job)
+  migrate:
+    image: migrate/migrate
+    container_name: novelai-migrate
+    volumes:
+      - ./go-gateway/migrations:/migrations:ro
+    command: [
+      "-path", "/migrations",
+      "-database", "postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/novelai?sslmode=disable",
+      "up"
+    ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - migrate
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    name: novelai-network

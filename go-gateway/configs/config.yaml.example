@@ -1,0 +1,22 @@
+server:
+  addr: ":8080"
+  mode: "release"
+
+auth:
+  jwt_secret: "change-me-in-production"
+  issuer: "novelai"
+  audience: "novelai-client"
+
+rate_limit:
+  rps: 20
+  burst: 40
+
+grpc:
+  ai_service_addr: "127.0.0.1:50051"
+  timeout_ms: 30000
+  max_conns: 8
+  retry_max: 2
+  retry_backoff_ms: 200
+
+log:
+  level: "info"

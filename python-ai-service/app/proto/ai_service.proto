@@ -1,0 +1,309 @@
+syntax = "proto3";
+
+package ai;
+
+option go_package = "go-gateway/internal/proto/ai";
+
+// AI 服务接口定义
+service AIService {
+    // 流式文本生成
+    rpc GenerateStream(GenerateRequest) returns (stream GenerateResponse);
+
+    // RAG 检索
+    rpc RetrieveContext(RetrieveRequest) returns (RetrieveResponse);
+
+    // 内容分析
+    rpc AnalyzeContent(AnalyzeRequest) returns (AnalyzeResponse);
+
+    // 质量评估
+    rpc EvaluateQuality(EvaluateRequest) returns (EvaluateResponse);
+
+    // 生成向量嵌入
+    rpc GenerateEmbedding(EmbeddingRequest) returns (EmbeddingResponse);
+
+    // 约束检查
+    rpc CheckConstraints(CheckConstraintsRequest) returns (CheckConstraintsResponse);
+
+    // 请求豁免
+    rpc RequestExemption(RequestExemptionRequest) returns (ExemptionResponse);
+
+    // 撤销豁免
+    rpc RevokeExemption(RevokeExemptionRequest) returns (RevokeExemptionResponse);
+
+    // 更新向量索引
+    rpc UpdateEmbedding(UpdateEmbeddingRequest) returns (UpdateEmbeddingResponse);
+
+    // 批量更新向量索引
+    rpc BatchUpdateEmbeddings(BatchUpdateEmbeddingsRequest) returns (BatchUpdateEmbeddingsResponse);
+
+    // 删除向量索引
+    rpc DeleteEmbedding(DeleteEmbeddingRequest) returns (DeleteEmbeddingResponse);
+}
+
+// 生成请求
+message GenerateRequest {
+    string prompt = 1;
+    string model = 2;
+    string provider = 3;
+    float temperature = 4;
+    int32 max_tokens = 5;
+    string system_prompt = 6;
+    string user_id = 7;
+    string project_id = 8;
+    map<string, string> metadata = 9;
+}
+
+// 生成响应 (流式)
+message GenerateResponse {
+    string content = 1;
+    bool done = 2;
+    string error = 3;
+    UsageInfo usage = 4;
+}
+
+// 用量信息
+message UsageInfo {
+    int32 input_tokens = 1;
+    int32 output_tokens = 2;
+    int32 total_tokens = 3;
+    string model = 4;
+    string provider = 5;
+}
+
+// RAG 检索请求
+message RetrieveRequest {
+    string project_id = 1;
+    string query = 2;
+    int32 top_k = 3;
+    repeated string layers = 4;
+    int32 chapter_range_start = 5;
+    int32 chapter_range_end = 6;
+}
+
+// RAG 检索响应
+message RetrieveResponse {
+    map<string, LayerResult> results = 1;
+    int32 total_tokens = 2;
+}
+
+// 层级检索结果
+message LayerResult {
+    repeated RetrievedItem items = 1;
+}
+
+// 检索项
+message RetrievedItem {
+    string content = 1;
+    float score = 2;
+    string source_type = 3;
+    string source_id = 4;
+    int32 chapter_number = 5;
+}
+
+// 内容分析请求
+message AnalyzeRequest {
+    string chapter_id = 1;
+    string content = 2;
+    repeated string analysis_types = 3;
+}
+
+// 内容分析响应
+message AnalyzeResponse {
+    float reading_power_score = 1;
+    HookAnalysis hook = 2;
+    CoolpointAnalysis coolpoint = 3;
+    MicropayoffAnalysis micropayoff = 4;
+    ConsistencyAnalysis consistency = 5;
+}
+
+// 钩子分析
+message HookAnalysis {
+    string hook_type = 1;
+    string hook_strength = 2;
+    string hook_content = 3;
+    float score = 4;
+}
+
+// 爽点分析
+message CoolpointAnalysis {
+    repeated CoolpointItem items = 1;
+    float score = 2;
+}
+
+message CoolpointItem {
+    string type = 1;
+    string content = 2;
+    int32 position = 3;
+    float intensity = 4;
+}
+
+// 微兑现分析
+message MicropayoffAnalysis {
+    repeated MicropayoffItem items = 1;
+    float score = 2;
+}
+
+message MicropayoffItem {
+    string goal = 1;
+    string payoff = 2;
+    int32 position = 3;
+}
+
+// 一致性分析
+message ConsistencyAnalysis {
+    float score = 1;
+    repeated ConsistencyIssue issues = 2;
+}
+
+message ConsistencyIssue {
+    string type = 1;
+    string severity = 2;
+    string description = 3;
+    repeated int32 chapter_refs = 4;
+    string suggestion = 5;
+}
+
+// 质量评估请求
+message EvaluateRequest {
+    string chapter_id = 1;
+    string content = 2;
+    string project_id = 3;
+}
+
+// 质量评估响应
+message EvaluateResponse {
+    float overall_score = 1;
+    map<string, float> dimension_scores = 2;
+    repeated string suggestions = 3;
+}
+
+// 向量嵌入请求
+message EmbeddingRequest {
+    repeated string texts = 1;
+    string model = 2;
+}
+
+// 向量嵌入响应
+message EmbeddingResponse {
+    repeated Embedding embeddings = 1;
+    int32 dimension = 2;
+    string model = 3;
+    UsageInfo usage = 4;
+}
+
+message Embedding {
+    repeated float vector = 1;
+}
+
+// 约束检查请求
+message CheckConstraintsRequest {
+    string project_id = 1;
+    string chapter_id = 2;
+    string content = 3;
+    repeated Constraint constraints = 4;
+}
+
+// 约束定义
+message Constraint {
+    string id = 1;
+    string type = 2;  // HARD or SOFT
+    string description = 3;
+    string rule = 4;
+}
+
+// 约束检查响应
+message CheckConstraintsResponse {
+    repeated ConstraintViolation violations = 1;
+    bool passed = 2;
+}
+
+// 约束违规
+message ConstraintViolation {
+    string constraint_id = 1;
+    string constraint_type = 2;
+    string description = 3;
+    string severity = 4;
+    string suggestion = 5;
+    bool can_exempt = 6;
+}
+
+// 请求豁免
+message RequestExemptionRequest {
+    string project_id = 1;
+    string chapter_id = 2;
+    string constraint_id = 3;
+    string reason = 4;
+    string requested_by = 5;
+}
+
+// 豁免响应
+message ExemptionResponse {
+    string id = 1;
+    string constraint_id = 2;
+    string chapter_id = 3;
+    string reason = 4;
+    string status = 5;
+    string created_at = 6;
+}
+
+// 撤销豁免请求
+message RevokeExemptionRequest {
+    string exemption_id = 1;
+}
+
+// 撤销豁免响应
+message RevokeExemptionResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+// 更新向量索引请求
+message UpdateEmbeddingRequest {
+    string project_id = 1;
+    string content_type = 2;  // settings, summaries, chunks, characters
+    string content_id = 3;
+    string content = 4;
+    int32 chapter_number = 5;  // 可选，仅 chunks/summaries 使用
+    map<string, string> metadata = 6;
+}
+
+// 更新向量索引响应
+message UpdateEmbeddingResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+// 批量更新向量索引请求
+message BatchUpdateEmbeddingsRequest {
+    string project_id = 1;
+    repeated EmbeddingItem items = 2;
+}
+
+// 嵌入项
+message EmbeddingItem {
+    string content_type = 1;
+    string content_id = 2;
+    string content = 3;
+    int32 chapter_number = 4;
+    map<string, string> metadata = 5;
+}
+
+// 批量更新向量索引响应
+message BatchUpdateEmbeddingsResponse {
+    bool success = 1;
+    int32 updated_count = 2;
+    string message = 3;
+}
+
+// 删除向量索引请求
+message DeleteEmbeddingRequest {
+    string project_id = 1;
+    string content_type = 2;  // 可选，为空则删除项目所有嵌入
+    string content_id = 3;    // 可选，为空则删除该类型所有嵌入
+}
+
+// 删除向量索引响应
+message DeleteEmbeddingResponse {
+    bool success = 1;
+    string message = 2;
+}
