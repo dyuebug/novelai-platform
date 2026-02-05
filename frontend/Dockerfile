@@ -12,29 +12,34 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build arguments for environment variables
-ARG VITE_API_BASE_URL=http://localhost:8080
-
-# Set environment variables for build
-ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
-
 # Build the application
 RUN npm run build
 
 # Production stage
 FROM nginx:alpine
 
+# 安装 envsubst (gettext 包提供)
+RUN apk add --no-cache gettext
+
 # Copy built assets
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy nginx configuration template
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
+
+# Copy entrypoint script
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN sed -i 's/\r$//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
 
 # Expose port
 EXPOSE 80
 
-# Health check
+# Health check (使用 curl 替代 wget，更可靠)
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-  CMD wget -q --spider http://localhost/ || exit 1
+  CMD curl -f http://localhost/ || exit 1
 
+# Set entrypoint
+ENTRYPOINT ["/docker-entrypoint.sh"]
+
+# Default command
 CMD ["nginx", "-g", "daemon off;"]

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # PostgreSQL with pgvector
   postgres:
@@ -33,6 +31,22 @@ services:
       timeout: 5s
       retries: 5
 
+  # Database Initialization (自动执行迁移)
+  init-db:
+    image: migrate/migrate
+    container_name: novelai-init-db
+    volumes:
+      - ./go-gateway/migrations:/migrations:ro
+    command: [
+      "-path", "/migrations",
+      "-database", "postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/novelai?sslmode=disable",
+      "up"
+    ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: on-failure
+
   # Go Gateway
   gateway:
     build:
@@ -46,15 +60,14 @@ services:
       - DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/novelai?sslmode=disable
       - REDIS_ADDR=redis:6379
       - GRPC_AI_SERVICE_ADDR=ai-service:50051
-      - JWT_PRIVATE_KEY_PATH=/app/keys/private.pem
-      - JWT_PUBLIC_KEY_PATH=/app/keys/public.pem
-    volumes:
-      - ./keys:/app/keys:ro
+      - JWT_SECRET=${JWT_SECRET}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      init-db:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/healthz"]
       interval: 30s
@@ -82,6 +95,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      init-db:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 30s
@@ -100,23 +115,6 @@ services:
       - VITE_API_BASE_URL=http://gateway:8080
     depends_on:
       - gateway
-
-  # Database Migration (one-time job)
-  migrate:
-    image: migrate/migrate
-    container_name: novelai-migrate
-    volumes:
-      - ./go-gateway/migrations:/migrations:ro
-    command: [
-      "-path", "/migrations",
-      "-database", "postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/novelai?sslmode=disable",
-      "up"
-    ]
-    depends_on:
-      postgres:
-        condition: service_healthy
-    profiles:
-      - migrate
 
 volumes:
   postgres_data:
