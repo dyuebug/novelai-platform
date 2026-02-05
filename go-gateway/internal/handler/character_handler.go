@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"go-gateway/internal/model"
 	"go-gateway/internal/repository"
 	"go-gateway/internal/service"
 	"go-gateway/pkg/response"
@@ -14,11 +16,26 @@ import (
 
 // ========== 角色 Handler ==========
 
-type CharacterHandler struct {
-	characterService *service.CharacterService
+// CharacterServiceInterface 角色服务接口
+type CharacterServiceInterface interface {
+	Create(ctx context.Context, userID, projectID uuid.UUID, req *service.CreateCharacterRequest) (*model.Character, error)
+	List(ctx context.Context, userID, projectID uuid.UUID, page, pageSize int, role, sort string) (*service.CharacterListResponse, error)
+	Get(ctx context.Context, userID, characterID uuid.UUID) (*model.Character, error)
+	Update(ctx context.Context, userID, characterID uuid.UUID, req *service.UpdateCharacterRequest) (*model.Character, error)
+	Delete(ctx context.Context, userID, characterID uuid.UUID) error
+	CreateRelationship(ctx context.Context, userID, characterID uuid.UUID, req *service.CreateRelationshipRequest) (*model.CharacterRelationship, error)
+	GetRelationships(ctx context.Context, userID, characterID uuid.UUID) ([]model.CharacterRelationship, error)
+	DeleteRelationship(ctx context.Context, userID, relID uuid.UUID) error
+	CreateExperience(ctx context.Context, userID, characterID uuid.UUID, req *service.CreateExperienceRequest) (*model.CharacterExperience, error)
+	GetExperiences(ctx context.Context, userID, characterID uuid.UUID) ([]model.CharacterExperience, error)
+	DeleteExperience(ctx context.Context, userID, expID uuid.UUID) error
 }
 
-func NewCharacterHandler(characterService *service.CharacterService) *CharacterHandler {
+type CharacterHandler struct {
+	characterService CharacterServiceInterface
+}
+
+func NewCharacterHandler(characterService CharacterServiceInterface) *CharacterHandler {
 	return &CharacterHandler{
 		characterService: characterService,
 	}

@@ -1,20 +1,32 @@
 package handler
 
 import (
+	"context"
 	"errors"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"go-gateway/internal/model"
 	"go-gateway/internal/repository"
 	"go-gateway/internal/service"
 	"go-gateway/pkg/response"
 )
 
-type AuthHandler struct {
-	authService *service.AuthService
+// AuthServiceInterface 认证服务接口
+type AuthServiceInterface interface {
+	Register(ctx context.Context, req *service.RegisterRequest) (*model.User, error)
+	Login(ctx context.Context, req *service.LoginRequest) (*service.TokenResponse, error)
+	RefreshToken(ctx context.Context, refreshToken string) (*service.TokenResponse, error)
+	RequestPasswordReset(ctx context.Context, email string) error
+	ResetPassword(ctx context.Context, token, newPassword string) error
 }
 
-func NewAuthHandler(authService *service.AuthService) *AuthHandler {
+type AuthHandler struct {
+	authService AuthServiceInterface
+}
+
+func NewAuthHandler(authService AuthServiceInterface) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
 	}
@@ -31,6 +43,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	user, err := h.authService.Register(c.Request.Context(), &req)
 	if err != nil {
+		log.Printf("Registration error: %v", err)
 		switch {
 		case errors.Is(err, repository.ErrUserAlreadyExists):
 			response.Error(c, http.StatusConflict, "user already exists")

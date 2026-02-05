@@ -5,16 +5,38 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"go-gateway/internal/model"
 	"go-gateway/internal/service"
 )
 
+// ForeshadowServiceInterface 伏笔服务接口
+type ForeshadowServiceInterface interface {
+	Create(projectID string, req *service.CreateForeshadowRequest) (*model.Foreshadow, error)
+	GetByID(id string) (*model.Foreshadow, error)
+	Update(id string, req *service.UpdateForeshadowRequest) (*model.Foreshadow, error)
+	Delete(id string) error
+	List(projectID, status, priority string, page, pageSize int) ([]model.Foreshadow, int64, error)
+	GetStats(projectID string, currentChapter int) (*model.ForeshadowStats, error)
+	Resolve(id, chapterID string, chapterNum int, content string) (*model.Foreshadow, error)
+	AddHint(foreshadowID, chapterID string, chapterNum int, content, hintType string) (*model.ForeshadowHint, error)
+	GetHints(foreshadowID string) ([]model.ForeshadowHint, error)
+	DeleteHint(hintID string) error
+	GetPendingReminders(projectID string, currentChapter int) ([]model.Foreshadow, error)
+	GetOverdueForeshadows(projectID string, currentChapter int) ([]model.Foreshadow, error)
+	CreateReminder(foreshadowID string, chapterNum int, message string) (*model.ForeshadowReminder, error)
+	GetUnreadReminders(projectID string) ([]model.ForeshadowReminder, error)
+	MarkReminderAsRead(reminderID string) error
+	MarkAllRemindersAsRead(projectID string) error
+	CheckAndCreateReminders(projectID string, currentChapter int) ([]model.ForeshadowReminder, error)
+}
+
 // ForeshadowHandler 伏笔处理器
 type ForeshadowHandler struct {
-	svc *service.ForeshadowService
+	svc ForeshadowServiceInterface
 }
 
 // NewForeshadowHandler 创建伏笔处理器
-func NewForeshadowHandler(svc *service.ForeshadowService) *ForeshadowHandler {
+func NewForeshadowHandler(svc ForeshadowServiceInterface) *ForeshadowHandler {
 	return &ForeshadowHandler{svc: svc}
 }
 
@@ -97,9 +119,9 @@ func (h *ForeshadowHandler) List(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"items": foreshadows,
-		"total": total,
-		"page":  page,
+		"items":     foreshadows,
+		"total":     total,
+		"page":      page,
 		"page_size": pageSize,
 	})
 }

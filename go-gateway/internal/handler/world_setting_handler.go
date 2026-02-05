@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"go-gateway/internal/model"
 	"go-gateway/internal/repository"
 	"go-gateway/internal/service"
 	"go-gateway/pkg/response"
@@ -14,11 +16,22 @@ import (
 
 // ========== 世界设定 Handler ==========
 
-type WorldSettingHandler struct {
-	settingService *service.WorldSettingService
+// WorldSettingServiceInterface 世界设定服务接口
+type WorldSettingServiceInterface interface {
+	Create(ctx context.Context, userID, projectID uuid.UUID, req *service.CreateWorldSettingRequest) (*model.WorldSetting, error)
+	List(ctx context.Context, userID, projectID uuid.UUID, page, pageSize int, category, sort string) (*service.WorldSettingListResponse, error)
+	GetTree(ctx context.Context, userID, projectID uuid.UUID, category string) ([]model.WorldSetting, error)
+	GetByCategory(ctx context.Context, userID, projectID uuid.UUID, category string) ([]model.WorldSetting, error)
+	Get(ctx context.Context, userID, settingID uuid.UUID) (*model.WorldSetting, error)
+	Update(ctx context.Context, userID, settingID uuid.UUID, req *service.UpdateWorldSettingRequest) (*model.WorldSetting, error)
+	Delete(ctx context.Context, userID, settingID uuid.UUID) error
 }
 
-func NewWorldSettingHandler(settingService *service.WorldSettingService) *WorldSettingHandler {
+type WorldSettingHandler struct {
+	settingService WorldSettingServiceInterface
+}
+
+func NewWorldSettingHandler(settingService WorldSettingServiceInterface) *WorldSettingHandler {
 	return &WorldSettingHandler{
 		settingService: settingService,
 	}

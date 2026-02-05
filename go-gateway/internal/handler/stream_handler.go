@@ -1,24 +1,37 @@
 package handler
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"go-gateway/internal/grpcclient"
 	"go-gateway/internal/service"
 )
 
-type StreamHandler struct {
-	ai service.AIService
+// StreamInterface 流式响应接口
+type StreamInterface interface {
+	Recv() (*grpcclient.GenerateResponse, error)
+	CloseSend() error
 }
 
-func NewStreamHandler(ai service.AIService) *StreamHandler {
+// AIServiceInterface AI 服务接口
+type AIServiceInterface interface {
+	GenerateStream(ctx context.Context, req *service.GenerateRequest) (service.Stream, error)
+}
+
+type StreamHandler struct {
+	ai AIServiceInterface
+}
+
+func NewStreamHandler(ai AIServiceInterface) *StreamHandler {
 	return &StreamHandler{ai: ai}
 }
 
 func (h *StreamHandler) Generate(c *gin.Context) {
-	req := &service.GenerateRequest{
+	req := &grpcclient.GenerateRequest{
 		Prompt:       c.Query("prompt"),
 		Model:        c.DefaultQuery("model", "gpt-4o"),
 		Provider:     c.DefaultQuery("provider", "openai"),

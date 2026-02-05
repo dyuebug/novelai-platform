@@ -1,21 +1,29 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"go-gateway/internal/grpcclient"
 	"go.uber.org/zap"
 )
 
+// QualityAIClientInterface AI 客户端接口
+type QualityAIClientInterface interface {
+	AnalyzeReadingPower(ctx context.Context, chapterID, content, provider, model string) (map[string]interface{}, error)
+	CheckConsistency(ctx context.Context, chapterID, content string, context map[string]interface{}, provider, model string) (map[string]interface{}, error)
+	MultiAgentReview(ctx context.Context, chapterID, content, provider, model string) (map[string]interface{}, error)
+	EvaluateQuality(ctx context.Context, chapterID, content string, context map[string]interface{}, provider, model string) (map[string]interface{}, error)
+}
+
 // QualityHandler 质量评估处理器
 type QualityHandler struct {
-	aiClient *grpcclient.AIClient
+	aiClient QualityAIClientInterface
 	logger   *zap.Logger
 }
 
 // NewQualityHandler 创建质量评估处理器
-func NewQualityHandler(aiClient *grpcclient.AIClient, logger *zap.Logger) *QualityHandler {
+func NewQualityHandler(aiClient QualityAIClientInterface, logger *zap.Logger) *QualityHandler {
 	return &QualityHandler{
 		aiClient: aiClient,
 		logger:   logger,

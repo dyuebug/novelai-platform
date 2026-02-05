@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -8,14 +9,21 @@ import (
 	"go.uber.org/zap"
 )
 
+// AIClientInterface gRPC AI 客户端接口
+type AIClientInterface interface {
+	CheckConstraints(ctx context.Context, req *grpcclient.CheckConstraintsRequest) (*grpcclient.CheckConstraintsResponse, error)
+	RequestExemption(ctx context.Context, req *grpcclient.RequestExemptionRequest) (*grpcclient.ExemptionResponse, error)
+	RevokeExemption(ctx context.Context, req *grpcclient.RevokeExemptionRequest) error
+}
+
 // ConstraintHandler 约束检查处理器
 type ConstraintHandler struct {
-	aiClient *grpcclient.AIClient
+	aiClient AIClientInterface
 	logger   *zap.Logger
 }
 
 // NewConstraintHandler 创建约束检查处理器
-func NewConstraintHandler(aiClient *grpcclient.AIClient, logger *zap.Logger) *ConstraintHandler {
+func NewConstraintHandler(aiClient AIClientInterface, logger *zap.Logger) *ConstraintHandler {
 	return &ConstraintHandler{
 		aiClient: aiClient,
 		logger:   logger,

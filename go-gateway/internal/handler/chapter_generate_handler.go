@@ -16,18 +16,33 @@ import (
 	"go-gateway/pkg/response"
 )
 
+// ChapterGenerateServiceInterface 章节生成服务接口
+type ChapterGenerateServiceInterface interface {
+	Get(ctx context.Context, userID, chapterID uuid.UUID) (*model.Chapter, error)
+}
+
+// ProjectGenerateServiceInterface 项目服务接口
+type ProjectGenerateServiceInterface interface {
+	Get(ctx context.Context, userID, projectID uuid.UUID) (*model.Project, error)
+}
+
+// AIGenerateServiceInterface AI 服务接口
+type AIGenerateServiceInterface interface {
+	GenerateStream(ctx context.Context, req *service.GenerateRequest) (service.Stream, error)
+}
+
 type ChapterGenerateHandler struct {
-	ai             service.AIService
-	chapterService *service.ChapterService
-	projectService *service.ProjectService
+	ai             AIGenerateServiceInterface
+	chapterService ChapterGenerateServiceInterface
+	projectService ProjectGenerateServiceInterface
 	chapterRepo    *repository.ChapterRepository
 	versionRepo    *repository.ChapterVersionRepository
 }
 
 func NewChapterGenerateHandler(
-	ai service.AIService,
-	chapterService *service.ChapterService,
-	projectService *service.ProjectService,
+	ai AIGenerateServiceInterface,
+	chapterService ChapterGenerateServiceInterface,
+	projectService ProjectGenerateServiceInterface,
 ) *ChapterGenerateHandler {
 	return &ChapterGenerateHandler{
 		ai:             ai,

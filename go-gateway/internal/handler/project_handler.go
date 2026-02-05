@@ -1,22 +1,36 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"go-gateway/internal/model"
 	"go-gateway/internal/repository"
 	"go-gateway/internal/service"
 	"go-gateway/pkg/response"
 )
 
-type ProjectHandler struct {
-	projectService *service.ProjectService
+// ProjectServiceInterface 项目服务接口
+type ProjectServiceInterface interface {
+	Create(ctx context.Context, userID uuid.UUID, req *service.CreateProjectRequest) (*model.Project, error)
+	List(ctx context.Context, userID uuid.UUID, page, pageSize int, status, genre, sort string) (*service.ProjectListResponse, error)
+	Get(ctx context.Context, userID, projectID uuid.UUID) (*model.Project, error)
+	Update(ctx context.Context, userID, projectID uuid.UUID, req *service.UpdateProjectRequest) (*model.Project, error)
+	Delete(ctx context.Context, userID, projectID uuid.UUID) error
+	Restore(ctx context.Context, userID, projectID uuid.UUID) (*model.Project, error)
+	UpdateMetadata(ctx context.Context, userID, projectID uuid.UUID, req *service.UpdateMetadataRequest) (*model.Project, error)
+	GetStatistics(ctx context.Context, userID, projectID uuid.UUID) (*service.ProjectStatistics, error)
 }
 
-func NewProjectHandler(projectService *service.ProjectService) *ProjectHandler {
+type ProjectHandler struct {
+	projectService ProjectServiceInterface
+}
+
+func NewProjectHandler(projectService ProjectServiceInterface) *ProjectHandler {
 	return &ProjectHandler{
 		projectService: projectService,
 	}
@@ -271,4 +285,72 @@ func (h *ProjectHandler) ListChapters(c *gin.Context) {
 		"page_size":   20,
 		"total_pages": 0,
 	})
+}
+
+// UpdateMetadata 更新项目元数据
+// PUT /api/v1/projects/:id/metadata
+func (h *ProjectHandler) UpdateMetadata(c *gin.Context) {
+	userID, err := getUserID(c)
+	if err != nil {
+		response.Error(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	projectID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "invalid project id")
+		return
+	}
+
+	var req service.UpdateMetadataRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "invalid request: "+err.Error())
+		return
+	}
+
+	project, err := h.projectService.UpdateMetadata(c.Request.Context(), userID, projectID, &req)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrProjectNotFound):
+			response.Error(c, http.StatusNotFound, "project not found")
+		case errors.Is(err, service.ErrProjectNotOwned):
+			response.Error(c, http.StatusForbidden, "access denied")
+		default:
+			response.Error(c, http.StatusInternalServerError, "failed to update metadata")
+		}
+		return
+	}
+
+	response.Success(c, http.StatusOK, "metadata updated successfully", project)
+}
+
+// GetStatistics 获取项目统计信息
+// GET /api/v1/projects/:id/statistics
+func (h *ProjectHandler) GetStatistics(c *gin.Context) {
+	userID, err := getUserID(c)
+	if err != nil {
+		response.Error(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	projectID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "invalid project id")
+		return
+	}
+
+	stats, err := h.projectService.GetStatistics(c.Request.Context(), userID, projectID)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrProjectNotFound):
+			response.Error(c, http.StatusNotFound, "project not found")
+		case errors.Is(err, service.ErrProjectNotOwned):
+			response.Error(c, http.StatusForbidden, "access denied")
+		default:
+			response.Error(c, http.StatusInternalServerError, "failed to get statistics")
+		}
+		return
+	}
+
+	response.Success(c, http.StatusOK, "statistics retrieved successfully", stats)
 }

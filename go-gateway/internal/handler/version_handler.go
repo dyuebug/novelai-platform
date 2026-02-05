@@ -1,22 +1,32 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"go-gateway/internal/model"
 	"go-gateway/internal/repository"
 	"go-gateway/internal/service"
 	"go-gateway/pkg/response"
 )
 
-type VersionHandler struct {
-	versionService *service.VersionService
+// VersionServiceInterface 版本服务接口
+type VersionServiceInterface interface {
+	ListVersions(ctx context.Context, userID, chapterID uuid.UUID, page, pageSize int) (*service.VersionListResponse, error)
+	GetVersion(ctx context.Context, userID, chapterID uuid.UUID, versionNumber int) (*model.ChapterVersion, error)
+	RestoreVersion(ctx context.Context, userID, chapterID uuid.UUID, versionNumber int) (*model.Chapter, error)
+	DiffVersions(ctx context.Context, userID, chapterID uuid.UUID, v1, v2 int) (*service.DiffResponse, error)
 }
 
-func NewVersionHandler(versionService *service.VersionService) *VersionHandler {
+type VersionHandler struct {
+	versionService VersionServiceInterface
+}
+
+func NewVersionHandler(versionService VersionServiceInterface) *VersionHandler {
 	return &VersionHandler{
 		versionService: versionService,
 	}

@@ -1,23 +1,35 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"go-gateway/internal/model"
 	"go-gateway/internal/repository"
 	"go-gateway/internal/service"
 	"go-gateway/pkg/response"
 )
 
-type ChapterHandler struct {
-	chapterService *service.ChapterService
-	projectService *service.ProjectService
+// ChapterServiceInterface 章节服务接口
+type ChapterServiceInterface interface {
+	Create(ctx context.Context, userID, projectID uuid.UUID, req *service.CreateChapterRequest) (*model.Chapter, error)
+	List(ctx context.Context, userID, projectID uuid.UUID, page, pageSize int, status, sort string) (*service.ChapterListResponse, error)
+	Get(ctx context.Context, userID, chapterID uuid.UUID) (*model.Chapter, error)
+	Update(ctx context.Context, userID, chapterID uuid.UUID, req *service.UpdateChapterRequest) (*model.Chapter, error)
+	Delete(ctx context.Context, userID, chapterID uuid.UUID) error
+	Reorder(ctx context.Context, userID, projectID uuid.UUID, req *service.ReorderChaptersRequest) error
 }
 
-func NewChapterHandler(chapterService *service.ChapterService, projectService *service.ProjectService) *ChapterHandler {
+type ChapterHandler struct {
+	chapterService ChapterServiceInterface
+	projectService ProjectServiceInterface
+}
+
+func NewChapterHandler(chapterService ChapterServiceInterface, projectService ProjectServiceInterface) *ChapterHandler {
 	return &ChapterHandler{
 		chapterService: chapterService,
 		projectService: projectService,

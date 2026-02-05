@@ -52,6 +52,22 @@ func Register(r *gin.Engine, cfg *config.Config, log *logger.Logger, authService
 	foreshadowService := service.NewForeshadowService()
 	foreshadowHandler := handler.NewForeshadowHandler(foreshadowService)
 
+	// 用户布局配置服务
+	userLayoutService := service.NewUserLayoutService()
+	userLayoutHandler := handler.NewUserLayoutHandler(userLayoutService)
+
+	// 文件上传服务
+	fileUploadService := service.NewFileUploadService()
+	fileUploadHandler := handler.NewFileUploadHandler(fileUploadService)
+
+	// 批量操作服务
+	batchOperationService := service.NewBatchOperationService()
+	batchOperationHandler := handler.NewBatchOperationHandler(batchOperationService, projectService)
+
+	// 搜索服务
+	searchService := service.NewSearchService()
+	searchHandler := handler.NewSearchHandler(searchService)
+
 	// OAuth 服务
 	oauthService := service.NewOAuthService(&cfg.OAuth, authService)
 	oauthHandler := handler.NewOAuthHandler(oauthService)
@@ -83,6 +99,25 @@ func Register(r *gin.Engine, cfg *config.Config, log *logger.Logger, authService
 		// 当前用户
 		protected.GET("/auth/me", authHandler.GetCurrentUser)
 
+		// 搜索
+		protected.GET("/search", searchHandler.GlobalSearch)
+
+		// 用户布局配置
+		protected.GET("/user/layout-configs", userLayoutHandler.GetAllLayoutConfigs)
+		protected.GET("/user/layout-config/:layoutType", userLayoutHandler.GetLayoutConfig)
+		protected.POST("/user/layout-config/:layoutType", userLayoutHandler.SaveLayoutConfig)
+		protected.DELETE("/user/layout-config/:layoutType", userLayoutHandler.DeleteLayoutConfig)
+		protected.POST("/user/layout-config/:layoutType/reset", userLayoutHandler.ResetLayoutConfig)
+
+		// 文件上传
+		protected.POST("/upload", fileUploadHandler.Upload)
+		protected.GET("/files", fileUploadHandler.ListFiles)
+		protected.GET("/files/stats", fileUploadHandler.GetStorageStats)
+		protected.GET("/files/:id", fileUploadHandler.GetFile)
+		protected.DELETE("/files/:id", fileUploadHandler.DeleteFile)
+		protected.GET("/files/:id/download", fileUploadHandler.DownloadFile)
+		protected.GET("/files/:id/thumbnail", fileUploadHandler.GetThumbnail)
+
 		// 项目
 		protected.GET("/projects", projectHandler.List)
 		protected.POST("/projects", projectHandler.Create)
@@ -90,11 +125,18 @@ func Register(r *gin.Engine, cfg *config.Config, log *logger.Logger, authService
 		protected.PUT("/projects/:id", projectHandler.Update)
 		protected.DELETE("/projects/:id", projectHandler.Delete)
 		protected.POST("/projects/:id/restore", projectHandler.Restore)
+		protected.PUT("/projects/:id/metadata", projectHandler.UpdateMetadata)
+		protected.GET("/projects/:id/statistics", projectHandler.GetStatistics)
+		protected.GET("/projects/:id/search", searchHandler.ProjectSearch)
+		protected.POST("/projects/:id/advanced-filter", searchHandler.AdvancedFilter)
 
 		// 章节 (项目下)
 		protected.GET("/projects/:id/chapters", chapterHandler.List)
 		protected.POST("/projects/:id/chapters", chapterHandler.Create)
 		protected.POST("/projects/:id/chapters/reorder", chapterHandler.Reorder)
+		protected.POST("/projects/:id/chapters/batch-update", batchOperationHandler.BatchUpdate)
+		protected.POST("/projects/:id/chapters/batch-delete", batchOperationHandler.BatchDelete)
+		protected.POST("/projects/:id/chapters/batch-status", batchOperationHandler.BatchStatusUpdate)
 
 		// 章节 (独立)
 		protected.GET("/chapters/:id", chapterHandler.Get)
@@ -119,8 +161,8 @@ func Register(r *gin.Engine, cfg *config.Config, log *logger.Logger, authService
 		protected.POST("/chapters/:id/evaluate-quality", qualityHandler.EvaluateQuality)
 
 		// 约束检查与豁免
-		protected.POST("/projects/:projectId/chapters/:chapterId/check-constraints", constraintHandler.CheckConstraints)
-		protected.POST("/projects/:projectId/chapters/:chapterId/exemptions", constraintHandler.RequestExemption)
+		protected.POST("/projects/:id/chapters/:chapterId/check-constraints", constraintHandler.CheckConstraints)
+		protected.POST("/projects/:id/chapters/:chapterId/exemptions", constraintHandler.RequestExemption)
 		protected.DELETE("/exemptions/:exemptionId", constraintHandler.RevokeExemption)
 
 		// 角色 (项目下)

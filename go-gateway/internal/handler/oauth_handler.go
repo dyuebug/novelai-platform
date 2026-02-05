@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -10,13 +11,20 @@ import (
 	"go-gateway/pkg/response"
 )
 
+// OAuthServiceInterface OAuth 服务接口
+type OAuthServiceInterface interface {
+	GetEnabledProviders() []string
+	GetAuthorizationURL(provider, redirectURI string) (string, error)
+	HandleCallback(ctx context.Context, provider, code, state string) (*service.TokenResponse, string, error)
+}
+
 // OAuthHandler OAuth 处理器
 type OAuthHandler struct {
-	oauthService *service.OAuthService
+	oauthService OAuthServiceInterface
 }
 
 // NewOAuthHandler 创建 OAuth 处理器
-func NewOAuthHandler(oauthService *service.OAuthService) *OAuthHandler {
+func NewOAuthHandler(oauthService OAuthServiceInterface) *OAuthHandler {
 	return &OAuthHandler{
 		oauthService: oauthService,
 	}

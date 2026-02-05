@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"go-gateway/internal/model"
 	"go-gateway/internal/repository"
 	"go-gateway/internal/service"
 	"go-gateway/pkg/response"
@@ -14,11 +16,21 @@ import (
 
 // ========== 地点 Handler ==========
 
-type LocationHandler struct {
-	locationService *service.LocationService
+// LocationServiceInterface 地点服务接口
+type LocationServiceInterface interface {
+	Create(ctx context.Context, userID, projectID uuid.UUID, req *service.CreateLocationRequest) (*model.Location, error)
+	List(ctx context.Context, userID, projectID uuid.UUID, page, pageSize int, locationType, sort string) (*service.LocationListResponse, error)
+	GetTree(ctx context.Context, userID, projectID uuid.UUID) ([]model.Location, error)
+	Get(ctx context.Context, userID, locationID uuid.UUID) (*model.Location, error)
+	Update(ctx context.Context, userID, locationID uuid.UUID, req *service.UpdateLocationRequest) (*model.Location, error)
+	Delete(ctx context.Context, userID, locationID uuid.UUID) error
 }
 
-func NewLocationHandler(locationService *service.LocationService) *LocationHandler {
+type LocationHandler struct {
+	locationService LocationServiceInterface
+}
+
+func NewLocationHandler(locationService LocationServiceInterface) *LocationHandler {
 	return &LocationHandler{
 		locationService: locationService,
 	}
@@ -240,11 +252,23 @@ func (h *LocationHandler) Delete(c *gin.Context) {
 
 // ========== 组织 Handler ==========
 
-type OrganizationHandler struct {
-	orgService *service.OrganizationService
+// OrganizationServiceInterface 组织服务接口
+type OrganizationServiceInterface interface {
+	Create(ctx context.Context, userID, projectID uuid.UUID, req *service.CreateOrganizationRequest) (*model.Organization, error)
+	List(ctx context.Context, userID, projectID uuid.UUID, page, pageSize int, orgType, sort string) (*service.OrganizationListResponse, error)
+	Get(ctx context.Context, userID, orgID uuid.UUID) (*model.Organization, error)
+	Update(ctx context.Context, userID, orgID uuid.UUID, req *service.UpdateOrganizationRequest) (*model.Organization, error)
+	Delete(ctx context.Context, userID, orgID uuid.UUID) error
+	AddMember(ctx context.Context, userID, orgID uuid.UUID, req *service.AddMemberRequest) (*model.OrganizationMember, error)
+	GetMembers(ctx context.Context, userID, orgID uuid.UUID) ([]model.OrganizationMember, error)
+	RemoveMember(ctx context.Context, userID, memberID uuid.UUID) error
 }
 
-func NewOrganizationHandler(orgService *service.OrganizationService) *OrganizationHandler {
+type OrganizationHandler struct {
+	orgService OrganizationServiceInterface
+}
+
+func NewOrganizationHandler(orgService OrganizationServiceInterface) *OrganizationHandler {
 	return &OrganizationHandler{
 		orgService: orgService,
 	}
