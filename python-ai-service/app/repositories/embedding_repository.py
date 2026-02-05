@@ -28,7 +28,7 @@ class EmbeddingModel(Base):
     content = Column(Text, nullable=False)
     chapter_number = Column(Integer, nullable=True)
     embedding = Column(Vector(settings.default_embedding_dim), nullable=False)
-    metadata = Column(JSONB, default={})
+    meta_data = Column(JSONB, default={})
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -75,7 +75,7 @@ class EmbeddingRepository:
                 existing.embedding = embedding
                 existing.chapter_number = chapter_number
                 if metadata:
-                    existing.metadata = metadata
+                    existing.meta_data = metadata
                 logger.info(
                     "Updated embedding",
                     project_id=project_id,
@@ -91,7 +91,7 @@ class EmbeddingRepository:
                     content=content,
                     embedding=embedding,
                     chapter_number=chapter_number,
-                    metadata=metadata or {},
+                    meta_data=metadata or {},
                 )
                 session.add(new_embedding)
                 logger.info(

@@ -8,22 +8,22 @@ import (
 
 // User 用户模型
 type User struct {
-	ID           uuid.UUID  `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
-	Username     string     `gorm:"size:50;uniqueIndex;not null" json:"username"`
-	Email        string     `gorm:"size:255;uniqueIndex;not null" json:"email"`
-	PasswordHash string     `gorm:"size:255" json:"-"`
-	AvatarURL    string     `gorm:"size:500" json:"avatar_url,omitempty"`
-	Role         string     `gorm:"size:20;default:user" json:"role"`
-	Status       string     `gorm:"size:20;default:active" json:"status"`
-	OAuthProvider string    `gorm:"size:50" json:"oauth_provider,omitempty"`
-	OAuthID      string     `gorm:"size:255" json:"oauth_id,omitempty"`
-	CreatedAt    time.Time  `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt    time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
-	LastLoginAt  *time.Time `json:"last_login_at,omitempty"`
+	ID            uuid.UUID  `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	Username      string     `gorm:"size:50;uniqueIndex;not null" json:"username"`
+	Email         string     `gorm:"size:255;uniqueIndex;not null" json:"email"`
+	PasswordHash  string     `gorm:"size:255" json:"-"`
+	AvatarURL     string     `gorm:"size:500;column:avatar_url" json:"avatar_url,omitempty"`
+	Role          string     `gorm:"size:20;default:user" json:"role"`
+	Status        string     `gorm:"size:20;default:active" json:"status"`
+	OAuthProvider string     `gorm:"size:50;column:oauth_provider" json:"oauth_provider,omitempty"`
+	OAuthID       string     `gorm:"size:255;column:oauth_id" json:"oauth_id,omitempty"`
+	CreatedAt     time.Time  `gorm:"autoCreateTime;column:created_at" json:"created_at"`
+	UpdatedAt     time.Time  `gorm:"autoUpdateTime;column:updated_at" json:"updated_at"`
+	LastLoginAt   *time.Time `gorm:"column:last_login_at" json:"last_login_at,omitempty"`
 
 	// 账户锁定
-	FailedAttempts int        `gorm:"default:0" json:"-"`
-	LockedUntil    *time.Time `json:"-"`
+	FailedAttempts int        `gorm:"default:0;column:failed_attempts" json:"-"`
+	LockedUntil    *time.Time `gorm:"column:locked_until" json:"-"`
 }
 
 // UserSettings 用户设置模型

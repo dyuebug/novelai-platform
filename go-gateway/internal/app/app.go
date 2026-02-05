@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go-gateway/internal/config"
+	"go-gateway/internal/database"
 	"go-gateway/internal/router"
 	"go-gateway/internal/service"
 	"go-gateway/pkg/logger"
@@ -19,6 +20,11 @@ type Server struct {
 func NewServer(cfg *config.Config, log *logger.Logger) *Server {
 	gin.SetMode(cfg.Server.Mode)
 	engine := gin.New()
+
+	// 初始化数据库连接
+	if err := database.Connect(cfg.Database); err != nil {
+		log.Fatal("failed to connect database", logger.Error(err))
+	}
 
 	// 初始化 EmailService
 	emailService := service.NewEmailService(&cfg.Email)

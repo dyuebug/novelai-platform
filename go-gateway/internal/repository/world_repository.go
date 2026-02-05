@@ -127,6 +127,33 @@ func (r *LocationRepository) Delete(ctx context.Context, id uuid.UUID) error {
 		Delete(&model.Location{}).Error
 }
 
+// Search 搜索地点
+func (r *LocationRepository) Search(ctx context.Context, projectID uuid.UUID, query string, page, pageSize int) ([]model.Location, int64, error) {
+	var locations []model.Location
+	var total int64
+
+	// 使用 ILIKE 进行模糊搜索
+	searchPattern := "%" + query + "%"
+
+	queryDB := database.DB.WithContext(ctx).
+		Model(&model.Location{}).
+		Where("project_id = ?", projectID).
+		Where("name ILIKE ? OR description ILIKE ? OR features ILIKE ?", searchPattern, searchPattern, searchPattern)
+
+	// 计算总数
+	queryDB.Count(&total)
+
+	// 分页
+	offset := (page - 1) * pageSize
+	result := queryDB.
+		Order("sort_order ASC, created_at DESC").
+		Offset(offset).
+		Limit(pageSize).
+		Find(&locations)
+
+	return locations, total, result.Error
+}
+
 // --- 组织 ---
 
 type OrganizationRepository struct{}

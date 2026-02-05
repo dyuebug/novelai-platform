@@ -89,6 +89,33 @@ func (r *CharacterRepository) Delete(ctx context.Context, id uuid.UUID) error {
 		Delete(&model.Character{}).Error
 }
 
+// Search 搜索角色
+func (r *CharacterRepository) Search(ctx context.Context, projectID uuid.UUID, query string, page, pageSize int) ([]model.Character, int64, error) {
+	var characters []model.Character
+	var total int64
+
+	// 使用 ILIKE 进行模糊搜索
+	searchPattern := "%" + query + "%"
+
+	queryDB := database.DB.WithContext(ctx).
+		Model(&model.Character{}).
+		Where("project_id = ?", projectID).
+		Where("name ILIKE ? OR alias ILIKE ? OR background ILIKE ?", searchPattern, searchPattern, searchPattern)
+
+	// 计算总数
+	queryDB.Count(&total)
+
+	// 分页
+	offset := (page - 1) * pageSize
+	result := queryDB.
+		Order("sort_order ASC, created_at DESC").
+		Offset(offset).
+		Limit(pageSize).
+		Find(&characters)
+
+	return characters, total, result.Error
+}
+
 // --- 角色关系 ---
 
 type CharacterRelationshipRepository struct{}

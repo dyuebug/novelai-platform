@@ -123,3 +123,115 @@ func (r *ChapterRepository) CountByProjectID(ctx context.Context, projectID uuid
 		Count(&count)
 	return count, result.Error
 }
+
+// Transaction 执行事务
+func (r *ChapterRepository) Transaction(ctx context.Context, fn func(context.Context) error) error {
+	return database.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 创建一个新的 context，包含事务
+		txCtx := context.WithValue(ctx, "tx", tx)
+		return fn(txCtx)
+	})
+}
+
+// Search 搜索章节
+func (r *ChapterRepository) Search(ctx context.Context, userID, projectID uuid.UUID, query string, page, pageSize int) ([]model.Chapter, int64, error) {
+	var chapters []model.Chapter
+	var total int64
+
+	// 使用 ILIKE 进行模糊搜索
+	searchPattern := "%" + query + "%"
+
+	queryDB := database.DB.WithContext(ctx).
+		Model(&model.Chapter{}).
+		Joins("JOIN projects ON chapters.project_id = projects.id").
+		Where("projects.user_id = ? AND projects.is_deleted = ?", userID, false).
+		Where("chapters.title ILIKE ? OR chapters.content ILIKE ? OR chapters.summary ILIKE ?", searchPattern, searchPattern, searchPattern)
+
+	// 如果指定了项目ID，只搜索该项目
+	if projectID != uuid.Nil {
+		queryDB = queryDB.Where("chapters.project_id = ?", projectID)
+	}
+
+	// 计算总数
+	queryDB.Count(&total)
+
+	// 分页
+	offset := (page - 1) * pageSize
+	result := queryDB.
+		Order("chapters.updated_at DESC").
+		Offset(offset).
+		Limit(pageSize).
+		Find(&chapters)
+
+	return chapters, total, result.Error
+}
+
+// AdvancedFilter 高级筛选章节
+func (r *ChapterRepository) AdvancedFilter(ctx context.Context, projectID uuid.UUID, req interface{}) ([]model.Chapter, int64, error) {
+	var chapters []model.Chapter
+	var total int64
+
+	// 类型断言获取筛选参数
+	type AdvancedFilterRequest struct {
+		Tags         []string
+		Status       []string
+		DateFrom     string
+		DateTo       string
+		WordCountMin int
+		WordCountMax int
+		Page         int
+		PageSize     int
+	}
+
+	filter, ok := req.(*AdvancedFilterRequest)
+	if !ok {
+		return nil, 0, errors.New("invalid filter request")
+	}
+
+	queryDB := database.DB.WithContext(ctx).
+		Model(&model.Chapter{}).
+		Where("project_id = ?", projectID)
+
+	// 状态筛选
+	if len(filter.Status) > 0 {
+		queryDB = queryDB.Where("status IN ?", filter.Status)
+	}
+
+	// 日期范围筛选
+	if filter.DateFrom != "" {
+		queryDB = queryDB.Where("created_at >= ?", filter.DateFrom)
+	}
+	if filter.DateTo != "" {
+		queryDB = queryDB.Where("created_at <= ?", filter.DateTo)
+	}
+
+	// 字数范围筛选
+	if filter.WordCountMin > 0 {
+		queryDB = queryDB.Where("word_count >= ?", filter.WordCountMin)
+	}
+	if filter.WordCountMax > 0 {
+		queryDB = queryDB.Where("word_count <= ?", filter.WordCountMax)
+	}
+
+	// 计算总数
+	queryDB.Count(&total)
+
+	// 分页
+	page := filter.Page
+	pageSize := filter.PageSize
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+
+	offset := (page - 1) * pageSize
+	result := queryDB.
+		Order("chapter_number ASC").
+		Offset(offset).
+		Limit(pageSize).
+		Find(&chapters)
+
+	return chapters, total, result.Error
+}

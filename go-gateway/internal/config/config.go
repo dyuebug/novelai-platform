@@ -1,6 +1,11 @@
 package config
 
 import (
+	"fmt"
+	"log"
+	"net/url"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -15,6 +20,9 @@ type Config struct {
 	RateLimit RateLimitConfig
 	GRPC      GRPCConfig
 	Log       LogConfig
+
+	// 内部字段：记录配置来源
+	configSources map[string]string
 }
 
 type ServerConfig struct {
@@ -104,7 +112,7 @@ func Load() *Config {
 	setDefaults(v)
 	_ = v.ReadInConfig()
 
-	return &Config{
+	cfg := &Config{
 		Server: ServerConfig{
 			Addr: v.GetString("server.addr"),
 			Mode: v.GetString("server.mode"),
@@ -185,6 +193,148 @@ func Load() *Config {
 		Log: LogConfig{
 			Level: v.GetString("log.level"),
 		},
+	}
+
+	// 环境变量优先级：覆盖 config.yaml 的配置
+	applyEnvOverrides(cfg)
+
+	// 验证必需配置项
+	validateConfig(cfg)
+
+	// 输出配置来源日志
+	logConfigSources(cfg)
+
+	return cfg
+}
+
+// parsePostgresURL 解析 PostgreSQL 连接字符串
+// 格式: postgres://user:password@host:port/dbname?sslmode=disable
+func parsePostgresURL(dbURL string) (*DatabaseConfig, error) {
+	u, err := url.Parse(dbURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid DATABASE_URL format: %w", err)
+	}
+
+	if u.Scheme != "postgres" && u.Scheme != "postgresql" {
+		return nil, fmt.Errorf("invalid DATABASE_URL scheme: expected postgres or postgresql, got %s", u.Scheme)
+	}
+
+	cfg := &DatabaseConfig{
+		Host:   u.Hostname(),
+		DBName: strings.TrimPrefix(u.Path, "/"),
+	}
+
+	// 解析端口
+	if u.Port() != "" {
+		var port int
+		fmt.Sscanf(u.Port(), "%d", &port)
+		cfg.Port = port
+	} else {
+		cfg.Port = 5432 // 默认 PostgreSQL 端口
+	}
+
+	// 解析用户名和密码
+	if u.User != nil {
+		cfg.User = u.User.Username()
+		if password, ok := u.User.Password(); ok {
+			cfg.Password = password
+		}
+	}
+
+	// 解析查询参数
+	query := u.Query()
+	if sslmode := query.Get("sslmode"); sslmode != "" {
+		cfg.SSLMode = sslmode
+	} else {
+		cfg.SSLMode = "disable"
+	}
+
+	return cfg, nil
+}
+
+// applyEnvOverrides 应用环境变量覆盖
+func applyEnvOverrides(cfg *Config) {
+	configSources := make(map[string]string)
+
+	// DATABASE_URL 优先级最高
+	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
+		dbCfg, err := parsePostgresURL(dbURL)
+		if err != nil {
+			log.Printf("WARNING: Failed to parse DATABASE_URL: %v, using config.yaml values", err)
+		} else {
+			cfg.Database.Host = dbCfg.Host
+			cfg.Database.Port = dbCfg.Port
+			cfg.Database.User = dbCfg.User
+			cfg.Database.Password = dbCfg.Password
+			cfg.Database.DBName = dbCfg.DBName
+			cfg.Database.SSLMode = dbCfg.SSLMode
+			configSources["database"] = "DATABASE_URL"
+		}
+	} else {
+		configSources["database"] = "config.yaml"
+	}
+
+	// GRPC_AI_SERVICE_ADDR 环境变量
+	if grpcAddr := os.Getenv("GRPC_AI_SERVICE_ADDR"); grpcAddr != "" {
+		cfg.GRPC.AIServiceAddr = grpcAddr
+		configSources["grpc"] = "GRPC_AI_SERVICE_ADDR"
+	} else {
+		configSources["grpc"] = "config.yaml"
+	}
+
+	// JWT_SECRET 环境变量
+	if jwtSecret := os.Getenv("JWT_SECRET"); jwtSecret != "" {
+		cfg.Auth.JWTSecret = jwtSecret
+		configSources["jwt"] = "JWT_SECRET"
+
+		// 验证 JWT_SECRET 长度
+		if len(jwtSecret) < 32 {
+			log.Printf("WARNING: JWT_SECRET is shorter than recommended 32 characters (current: %d). Consider using a stronger secret.", len(jwtSecret))
+		}
+	} else {
+		configSources["jwt"] = "config.yaml"
+	}
+
+	// 存储配置来源供日志使用
+	cfg.configSources = configSources
+}
+
+// validateConfig 验证必需配置项
+func validateConfig(cfg *Config) {
+	var errors []string
+
+	// 验证数据库配置
+	if cfg.Database.Host == "" {
+		errors = append(errors, "Database host is not configured (set DATABASE_URL or database.host in config.yaml)")
+	}
+	if cfg.Database.DBName == "" {
+		errors = append(errors, "Database name is not configured (set DATABASE_URL or database.dbname in config.yaml)")
+	}
+
+	// 验证 JWT 密钥
+	if cfg.Auth.JWTSecret == "" || cfg.Auth.JWTSecret == "change-me" {
+		errors = append(errors, "JWT secret is not configured or using default value (set JWT_SECRET environment variable or auth.jwt_secret in config.yaml)")
+	}
+
+	// 验证 gRPC 地址
+	if cfg.GRPC.AIServiceAddr == "" {
+		errors = append(errors, "gRPC AI service address is not configured (set GRPC_AI_SERVICE_ADDR or grpc.ai_service_addr in config.yaml)")
+	}
+
+	if len(errors) > 0 {
+		log.Println("Configuration validation failed:")
+		for _, err := range errors {
+			log.Printf("  - %s", err)
+		}
+		os.Exit(1)
+	}
+}
+
+// logConfigSources 输出配置来源日志
+func logConfigSources(cfg *Config) {
+	log.Println("Configuration loaded successfully:")
+	for key, source := range cfg.configSources {
+		log.Printf("  - %s: %s", key, source)
 	}
 }
 

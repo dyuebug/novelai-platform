@@ -143,3 +143,74 @@ type ListOptions struct {
 	Genre    string
 	Sort     string
 }
+
+// ProjectStatistics 项目统计信息
+type ProjectStatistics struct {
+	CharacterCount  int64
+	LocationCount   int64
+	ForeshadowCount int64
+}
+
+// GetProjectStatistics 获取项目统计信息
+func (r *ProjectRepository) GetProjectStatistics(ctx context.Context, projectID uuid.UUID) (*ProjectStatistics, error) {
+	stats := &ProjectStatistics{}
+
+	// 统计角色数量
+	var characterCount int64
+	if err := database.DB.WithContext(ctx).
+		Model(&model.Character{}).
+		Where("project_id = ?", projectID).
+		Count(&characterCount).Error; err != nil {
+		return nil, err
+	}
+	stats.CharacterCount = characterCount
+
+	// 统计地点数量
+	var locationCount int64
+	if err := database.DB.WithContext(ctx).
+		Model(&model.Location{}).
+		Where("project_id = ?", projectID).
+		Count(&locationCount).Error; err != nil {
+		return nil, err
+	}
+	stats.LocationCount = locationCount
+
+	// 统计伏笔数量
+	var foreshadowCount int64
+	if err := database.DB.WithContext(ctx).
+		Model(&model.Foreshadow{}).
+		Where("project_id = ?", projectID).
+		Count(&foreshadowCount).Error; err != nil {
+		return nil, err
+	}
+	stats.ForeshadowCount = foreshadowCount
+
+	return stats, nil
+}
+
+// Search 搜索项目
+func (r *ProjectRepository) Search(ctx context.Context, userID uuid.UUID, query string, page, pageSize int) ([]model.Project, int64, error) {
+	var projects []model.Project
+	var total int64
+
+	// 使用 ILIKE 进行模糊搜索
+	searchPattern := "%" + query + "%"
+
+	queryDB := database.DB.WithContext(ctx).
+		Model(&model.Project{}).
+		Where("user_id = ? AND is_deleted = ?", userID, false).
+		Where("title ILIKE ? OR description ILIKE ?", searchPattern, searchPattern)
+
+	// 计算总数
+	queryDB.Count(&total)
+
+	// 分页
+	offset := (page - 1) * pageSize
+	result := queryDB.
+		Order("updated_at DESC").
+		Offset(offset).
+		Limit(pageSize).
+		Find(&projects)
+
+	return projects, total, result.Error
+}

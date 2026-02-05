@@ -3,9 +3,9 @@ package service
 import (
 	"context"
 	"crypto/rand"
-	"crypto/rsa"
 	"encoding/base64"
 	"errors"
+	"log"
 	"time"
 
 	"go-gateway/internal/config"
@@ -39,15 +39,12 @@ type AuthService struct {
 	resetTokenRepo   *repository.PasswordResetTokenRepository
 	emailService     *EmailService
 	config           config.AuthConfig
-	privateKey       *rsa.PrivateKey
-	publicKey        *rsa.PublicKey
 }
 
 func NewAuthService(cfg config.AuthConfig, emailService *EmailService) (*AuthService, error) {
-	// 生成 RSA 密钥对 (生产环境应从配置加载)
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return nil, err
+	// 验证 JWT_SECRET 长度
+	if len(cfg.JWTSecret) < 32 {
+		log.Printf("WARNING: JWT_SECRET is shorter than recommended 32 characters (current: %d). Consider using a stronger secret.", len(cfg.JWTSecret))
 	}
 
 	return &AuthService{
@@ -56,8 +53,6 @@ func NewAuthService(cfg config.AuthConfig, emailService *EmailService) (*AuthSer
 		resetTokenRepo:   repository.NewPasswordResetTokenRepository(),
 		emailService:     emailService,
 		config:           cfg,
-		privateKey:       privateKey,
-		publicKey:        &privateKey.PublicKey,
 	}, nil
 }
 
@@ -177,7 +172,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*T
 func (s *AuthService) GenerateTokens(ctx context.Context, user *model.User) (*TokenResponse, error) {
 	now := time.Now()
 
-	// 生成 Access Token (RS256)
+	// 生成 Access Token (HMAC-SHA256)
 	accessClaims := jwt.MapClaims{
 		"sub":   user.ID.String(),
 		"iss":   s.config.Issuer,
@@ -187,8 +182,8 @@ func (s *AuthService) GenerateTokens(ctx context.Context, user *model.User) (*To
 		"roles": []string{user.Role},
 		"email": user.Email,
 	}
-	accessToken := jwt.NewWithClaims(jwt.SigningMethodRS256, accessClaims)
-	accessTokenString, err := accessToken.SignedString(s.privateKey)
+	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
+	accessTokenString, err := accessToken.SignedString([]byte(s.config.JWTSecret))
 	if err != nil {
 		return nil, err
 	}
@@ -221,10 +216,10 @@ func (s *AuthService) GenerateTokens(ctx context.Context, user *model.User) (*To
 // ValidateToken 验证访问令牌
 func (s *AuthService) ValidateToken(tokenString string) (*jwt.MapClaims, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, jwt.ErrSignatureInvalid
 		}
-		return s.publicKey, nil
+		return []byte(s.config.JWTSecret), nil
 	})
 	if err != nil {
 		return nil, err
@@ -323,11 +318,6 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword stri
 	s.refreshTokenRepo.RevokeAllForUser(ctx, user.ID)
 
 	return nil
-}
-
-// GetPublicKey 获取公钥 (用于其他服务验证)
-func (s *AuthService) GetPublicKey() *rsa.PublicKey {
-	return s.publicKey
 }
 
 // isStrongPassword 检查密码强度

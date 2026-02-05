@@ -196,3 +196,70 @@ func (s *ProjectService) Restore(ctx context.Context, userID, projectID uuid.UUI
 	// 重新获取项目
 	return s.projectRepo.FindByID(ctx, projectID)
 }
+
+// UpdateMetadataRequest 更新元数据请求
+type UpdateMetadataRequest struct {
+	Metadata map[string]interface{} `json:"metadata" binding:"required"`
+}
+
+// UpdateMetadata 更新项目元数据
+func (s *ProjectService) UpdateMetadata(ctx context.Context, userID, projectID uuid.UUID, req *UpdateMetadataRequest) (*model.Project, error) {
+	project, err := s.projectRepo.FindByID(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 检查所有权
+	if project.UserID != userID {
+		return nil, ErrProjectNotOwned
+	}
+
+	// 更新元数据
+	project.Metadata = model.JSON(req.Metadata)
+
+	if err := s.projectRepo.Update(ctx, project); err != nil {
+		return nil, err
+	}
+
+	return project, nil
+}
+
+// ProjectStatistics 项目统计信息
+type ProjectStatistics struct {
+	TotalChapters   int                    `json:"total_chapters"`
+	TotalWords      int                    `json:"total_words"`
+	CharacterCount  int64                  `json:"character_count"`
+	LocationCount   int64                  `json:"location_count"`
+	ForeshadowCount int64                  `json:"foreshadow_count"`
+	LastUpdated     string                 `json:"last_updated"`
+	Metadata        map[string]interface{} `json:"metadata"`
+}
+
+// GetStatistics 获取项目统计信息
+func (s *ProjectService) GetStatistics(ctx context.Context, userID, projectID uuid.UUID) (*ProjectStatistics, error) {
+	project, err := s.projectRepo.FindByID(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 检查所有权
+	if project.UserID != userID {
+		return nil, ErrProjectNotOwned
+	}
+
+	// 获取统计信息
+	stats, err := s.projectRepo.GetProjectStatistics(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ProjectStatistics{
+		TotalChapters:   project.TotalChapters,
+		TotalWords:      project.TotalWords,
+		CharacterCount:  stats.CharacterCount,
+		LocationCount:   stats.LocationCount,
+		ForeshadowCount: stats.ForeshadowCount,
+		LastUpdated:     project.UpdatedAt.Format("2006-01-02 15:04:05"),
+		Metadata:        project.Metadata,
+	}, nil
+}

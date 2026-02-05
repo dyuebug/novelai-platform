@@ -55,6 +55,8 @@ app.add_middleware(
 @app.get("/health")
 async def health_check():
     """健康检查"""
+    # 使用 DEBUG 级别避免日志刷屏
+    logger.debug("Health check requested")
     return {"status": "healthy", "service": "ai-service"}
 
 
