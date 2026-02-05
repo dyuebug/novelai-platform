@@ -45,7 +45,6 @@ const ChapterEditor = () => {
 
   const [historyOpen, setHistoryOpen] = useState(false)
   const [aiPanelOpen, setAiPanelOpen] = useState(false)
-  const [selectedText, setSelectedText] = useState('')
 
   // 自动保存定时器
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -192,21 +191,6 @@ const ChapterEditor = () => {
     }, AUTOSAVE_DELAY)
   }, [saveChapter])
 
-  // AI 替换选中内容
-  const handleReplaceSelection = useCallback((original: string, replacement: string) => {
-    const newContent = content.replace(original, replacement)
-    setContent(newContent)
-    setSaveStatus('unsaved')
-    setSelectedText('')
-    // 触发自动保存
-    if (autoSaveTimer.current) {
-      clearTimeout(autoSaveTimer.current)
-    }
-    autoSaveTimer.current = setTimeout(() => {
-      saveChapter(true)
-    }, AUTOSAVE_DELAY)
-  }, [content, saveChapter])
-
   // 保存状态图标
   const SaveStatusIcon = () => {
     switch (saveStatus) {
@@ -338,9 +322,7 @@ const ChapterEditor = () => {
           <RichTextEditor
             content={content}
             onChange={handleContentChange}
-            onWordCountChange={setWordCount}
             placeholder="开始写作..."
-            className="h-full"
           />
         </div>
       </Card>
@@ -355,12 +337,9 @@ const ChapterEditor = () => {
 
       {/* AI 助手面板 */}
       <AIChatPanel
-        chapterId={chapterId || ''}
-        open={aiPanelOpen}
+        visible={aiPanelOpen}
         onClose={() => setAiPanelOpen(false)}
-        onContentGenerated={handleAIContentGenerated}
-        selectedText={selectedText}
-        onReplaceSelection={handleReplaceSelection}
+        onInsert={handleAIContentGenerated}
       />
     </div>
   )

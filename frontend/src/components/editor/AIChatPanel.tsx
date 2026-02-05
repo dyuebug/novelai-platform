@@ -1,282 +1,163 @@
-import { useState, useRef, useCallback } from 'react'
-import {
-  Drawer,
-  Input,
-  Button,
-  Select,
-  Tabs,
-  Space,
-  message,
-  Spin,
-  Typography,
-} from 'antd'
-import {
-  SendOutlined,
-  StopOutlined,
-  RobotOutlined,
-  EditOutlined,
-  HighlightOutlined,
-} from '@ant-design/icons'
-import { aiService, SSEDoneEvent } from '@/services/ai.service'
+import { useState } from 'react'
+import { Drawer, Tabs, Form, Select, Input, Button, Card, Space, message } from 'antd'
+import { SendOutlined, StopOutlined, CopyOutlined, CheckOutlined } from '@ant-design/icons'
+import type { FC } from 'react'
 
 const { TextArea } = Input
-const { Text } = Typography
 
 interface AIChatPanelProps {
-  chapterId: string
-  open: boolean
+  visible: boolean
   onClose: () => void
-  onContentGenerated?: (content: string) => void
-  selectedText?: string
-  onReplaceSelection?: (original: string, replacement: string) => void
+  onInsert?: (text: string) => void
 }
 
-const modelOptions = [
-  { value: 'gpt-4o', label: 'GPT-4o' },
-  { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
-  { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
-  { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
-]
-
-const providerOptions = [
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'gemini', label: 'Google' },
-]
-
-type TabKey = 'generate' | 'rewrite' | 'polish'
-
-const AIChatPanel = ({
-  chapterId,
-  open,
+export const AIChatPanel: FC<AIChatPanelProps> = ({
+  visible,
   onClose,
-  onContentGenerated,
-  selectedText,
-  onReplaceSelection,
-}: AIChatPanelProps) => {
-  const [activeTab, setActiveTab] = useState<TabKey>('generate')
-  const [model, setModel] = useState('gpt-4o')
-  const [provider, setProvider] = useState('openai')
-  const [instruction, setInstruction] = useState('')
+  onInsert,
+}) => {
+  const [activeTab, setActiveTab] = useState('generate')
+  const [form] = Form.useForm()
   const [generating, setGenerating] = useState(false)
   const [generatedContent, setGeneratedContent] = useState('')
 
-  const abortControllerRef = useRef<AbortController | null>(null)
+  const handleGenerate = async () => {
+    try {
+      await form.validateFields()
+      setGenerating(true)
+      setGeneratedContent('')
 
-  // 处理生成完成
-  const handleDone = useCallback(
-    (data: SSEDoneEvent) => {
-      setGenerating(false)
-      if (data.word_count) {
-        message.success(`生成完成，共 ${data.word_count} 字`)
+      // TODO: 实现SSE流式生成
+      // const eventSource = new EventSource(`/api/ai/generate?prompt=${values.prompt}`)
+      // eventSource.onmessage = (event) => {
+      //   setGeneratedContent(prev => prev + event.data)
+      // }
+
+      // 模拟流式生成
+      const mockContent = '这是AI生成的内容...'
+      for (let i = 0; i < mockContent.length; i++) {
+        await new Promise(resolve => setTimeout(resolve, 50))
+        setGeneratedContent(mockContent.slice(0, i + 1))
       }
-    },
-    []
-  )
+      setGenerating(false)
+    } catch (error) {
+      message.error('生成失败')
+      setGenerating(false)
+    }
+  }
 
-  // 处理错误
-  const handleError = useCallback((error: string) => {
+  const handleStop = () => {
     setGenerating(false)
-    message.error(`生成失败: ${error}`)
-  }, [])
+    message.info('已停止生成')
+  }
 
-  // 停止生成
-  const handleStop = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
-      abortControllerRef.current = null
+  const handleInsert = () => {
+    if (generatedContent) {
+      onInsert?.(generatedContent)
+      onClose()
     }
-    setGenerating(false)
-  }, [])
+  }
 
-  // 生成章节内容
-  const handleGenerate = useCallback(() => {
-    if (!chapterId) return
-
-    setGenerating(true)
-    setGeneratedContent('')
-
-    abortControllerRef.current = new AbortController()
-
-    aiService.generateChapter(
-      chapterId,
-      {
-        model,
-        provider,
-        instruction: instruction || undefined,
-      },
-      (text) => {
-        setGeneratedContent((prev) => prev + text)
-      },
-      handleDone,
-      handleError,
-      abortControllerRef.current.signal
-    )
-  }, [chapterId, model, provider, instruction, handleDone, handleError])
-
-  // 局部重写
-  const handleRewrite = useCallback(() => {
-    if (!chapterId || !selectedText) {
-      message.warning('请先选择要重写的文本')
-      return
-    }
-
-    setGenerating(true)
-    setGeneratedContent('')
-
-    abortControllerRef.current = new AbortController()
-
-    aiService.partialRegenerate(
-      chapterId,
-      {
-        selection: selectedText,
-        instruction: instruction || undefined,
-        model,
-        provider,
-      },
-      (text) => {
-        setGeneratedContent((prev) => prev + text)
-      },
-      (data) => {
-        setGenerating(false)
-        if (data.replacement && onReplaceSelection) {
-          // 提供替换选项
-          message.success('重写完成，点击"应用"替换原文')
-        }
-      },
-      handleError,
-      abortControllerRef.current.signal
-    )
-  }, [chapterId, selectedText, model, provider, instruction, handleError, onReplaceSelection])
-
-  // 润色
-  const handlePolish = useCallback(() => {
-    if (!chapterId) return
-
-    setGenerating(true)
-    setGeneratedContent('')
-
-    abortControllerRef.current = new AbortController()
-
-    aiService.polish(
-      chapterId,
-      {
-        model,
-        provider,
-        instruction: instruction || undefined,
-      },
-      (text) => {
-        setGeneratedContent((prev) => prev + text)
-      },
-      handleDone,
-      handleError,
-      abortControllerRef.current.signal
-    )
-  }, [chapterId, model, provider, instruction, handleDone, handleError])
-
-  // 应用生成的内容
-  const handleApply = useCallback(() => {
-    if (activeTab === 'rewrite' && selectedText && onReplaceSelection) {
-      onReplaceSelection(selectedText, generatedContent)
-      message.success('已替换选中内容')
-    } else if (onContentGenerated) {
-      onContentGenerated(generatedContent)
-      message.success('已应用生成内容')
-    }
-    setGeneratedContent('')
-    setInstruction('')
-  }, [activeTab, selectedText, generatedContent, onContentGenerated, onReplaceSelection])
+  const handleCopy = () => {
+    navigator.clipboard.writeText(generatedContent)
+    message.success('已复制到剪贴板')
+  }
 
   const tabItems = [
     {
       key: 'generate',
-      label: (
-        <span>
-          <RobotOutlined />
-          生成
-        </span>
-      ),
+      label: '生成',
       children: (
         <div className="space-y-4">
-          <TextArea
-            value={instruction}
-            onChange={(e) => setInstruction(e.target.value)}
-            placeholder="输入写作指令，例如：写一段主角觉醒的场景..."
-            rows={3}
-          />
-          <Button
-            type="primary"
-            icon={generating ? <StopOutlined /> : <SendOutlined />}
-            onClick={generating ? handleStop : handleGenerate}
-            block
-          >
-            {generating ? '停止生成' : '开始生成'}
-          </Button>
+          <Form form={form} layout="vertical">
+            <Form.Item label="AI提供商" name="provider" initialValue="openai">
+              <Select
+                options={[
+                  { label: 'OpenAI', value: 'openai' },
+                  { label: 'Anthropic', value: 'anthropic' },
+                  { label: 'Gemini', value: 'gemini' },
+                ]}
+              />
+            </Form.Item>
+
+            <Form.Item label="模型" name="model" initialValue="gpt-4o">
+              <Select
+                options={[
+                  { label: 'GPT-4o', value: 'gpt-4o' },
+                  { label: 'Claude 3 Opus', value: 'claude-3-opus' },
+                  { label: 'Gemini Pro', value: 'gemini-pro' },
+                ]}
+              />
+            </Form.Item>
+
+            <Form.Item
+              label="提示词"
+              name="prompt"
+              rules={[{ required: true, message: '请输入提示词' }]}
+            >
+              <TextArea rows={6} placeholder="描述您想要生成的内容..." />
+            </Form.Item>
+          </Form>
+
+          <Space className="w-full" direction="vertical">
+            {!generating ? (
+              <Button
+                type="primary"
+                icon={<SendOutlined />}
+                onClick={handleGenerate}
+                block
+              >
+                生成
+              </Button>
+            ) : (
+              <Button danger icon={<StopOutlined />} onClick={handleStop} block>
+                停止生成
+              </Button>
+            )}
+          </Space>
+
+          {generatedContent && (
+            <Card
+              title="生成结果"
+              extra={
+                <Space>
+                  <Button size="small" icon={<CopyOutlined />} onClick={handleCopy}>
+                    复制
+                  </Button>
+                  <Button
+                    size="small"
+                    type="primary"
+                    icon={<CheckOutlined />}
+                    onClick={handleInsert}
+                  >
+                    插入
+                  </Button>
+                </Space>
+              }
+            >
+              <div className="whitespace-pre-wrap max-h-96 overflow-auto">
+                {generatedContent}
+              </div>
+            </Card>
+          )}
         </div>
       ),
     },
     {
       key: 'rewrite',
-      label: (
-        <span>
-          <EditOutlined />
-          重写
-        </span>
-      ),
+      label: '重写',
       children: (
-        <div className="space-y-4">
-          {selectedText ? (
-            <div className="p-3 bg-gray-50 rounded text-sm max-h-24 overflow-auto">
-              <Text type="secondary">选中的文本：</Text>
-              <div className="mt-1">{selectedText}</div>
-            </div>
-          ) : (
-            <div className="p-3 bg-yellow-50 rounded text-sm">
-              <Text type="warning">请在编辑器中选择要重写的文本</Text>
-            </div>
-          )}
-          <TextArea
-            value={instruction}
-            onChange={(e) => setInstruction(e.target.value)}
-            placeholder="输入重写指令，例如：让这段更有张力..."
-            rows={2}
-          />
-          <Button
-            type="primary"
-            icon={generating ? <StopOutlined /> : <SendOutlined />}
-            onClick={generating ? handleStop : handleRewrite}
-            disabled={!selectedText}
-            block
-          >
-            {generating ? '停止生成' : '重写选中内容'}
-          </Button>
+        <div className="text-center text-gray-400 py-8">
+          重写功能开发中...
         </div>
       ),
     },
     {
       key: 'polish',
-      label: (
-        <span>
-          <HighlightOutlined />
-          润色
-        </span>
-      ),
+      label: '润色',
       children: (
-        <div className="space-y-4">
-          <TextArea
-            value={instruction}
-            onChange={(e) => setInstruction(e.target.value)}
-            placeholder="输入润色要求，例如：增强对话的情感表达..."
-            rows={2}
-          />
-          <Button
-            type="primary"
-            icon={generating ? <StopOutlined /> : <SendOutlined />}
-            onClick={generating ? handleStop : handlePolish}
-            block
-          >
-            {generating ? '停止生成' : '开始润色'}
-          </Button>
+        <div className="text-center text-gray-400 py-8">
+          润色功能开发中...
         </div>
       ),
     },
@@ -284,69 +165,13 @@ const AIChatPanel = ({
 
   return (
     <Drawer
-      title={
-        <span>
-          <RobotOutlined className="mr-2" />
-          AI 助手
-        </span>
-      }
+      title="AI助手"
       placement="right"
-      width={450}
-      open={open}
       onClose={onClose}
-      extra={
-        <Space>
-          <Select
-            value={provider}
-            onChange={setProvider}
-            options={providerOptions}
-            style={{ width: 100 }}
-            size="small"
-          />
-          <Select
-            value={model}
-            onChange={setModel}
-            options={modelOptions}
-            style={{ width: 140 }}
-            size="small"
-          />
-        </Space>
-      }
+      open={visible}
+      width={480}
     >
-      <div className="flex flex-col h-full">
-        <Tabs
-          activeKey={activeTab}
-          onChange={(key) => setActiveTab(key as TabKey)}
-          items={tabItems}
-        />
-
-        {/* 生成结果区域 */}
-        <div className="flex-1 mt-4 overflow-hidden">
-          <div className="text-sm text-gray-500 mb-2">生成结果：</div>
-          <div className="h-64 p-3 bg-gray-50 rounded overflow-auto">
-            {generating && generatedContent === '' ? (
-              <div className="flex items-center justify-center h-full">
-                <Spin tip="正在生成..." />
-              </div>
-            ) : generatedContent ? (
-              <div className="whitespace-pre-wrap text-sm">{generatedContent}</div>
-            ) : (
-              <div className="flex items-center justify-center h-full text-gray-400">
-                生成的内容将显示在这里
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 应用按钮 */}
-        {generatedContent && !generating && (
-          <div className="mt-4">
-            <Button type="primary" onClick={handleApply} block>
-              应用到编辑器
-            </Button>
-          </div>
-        )}
-      </div>
+      <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />
     </Drawer>
   )
 }

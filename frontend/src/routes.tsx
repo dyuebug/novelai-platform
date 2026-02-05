@@ -12,6 +12,7 @@ const ProjectDetail = lazy(() => import('@/features/editor/ProjectDetail'))
 const ChapterEditor = lazy(() => import('@/features/editor/ChapterEditor'))
 const WorldManager = lazy(() => import('@/features/world'))
 const ForeshadowManager = lazy(() => import('@/pages/ForeshadowManager'))
+const Settings = lazy(() => import('@/pages/Settings'))
 
 // 布局组件
 const AppLayout = lazy(() => import('@/components/layout/AppLayout'))
@@ -115,6 +116,14 @@ export const router = createBrowserRouter([
             element: (
               <Suspense fallback={<Loading />}>
                 <ForeshadowManager />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'settings',
+            element: (
+              <Suspense fallback={<Loading />}>
+                <Settings />
               </Suspense>
             ),
           },

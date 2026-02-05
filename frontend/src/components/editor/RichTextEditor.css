@@ -1,0 +1,53 @@
+.rich-text-editor {
+  @apply w-full;
+}
+
+.rich-text-editor .ProseMirror {
+  @apply focus:outline-none;
+}
+
+.rich-text-editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  @apply text-gray-400 float-left h-0 pointer-events-none;
+}
+
+.rich-text-editor .ProseMirror h1 {
+  @apply text-3xl font-bold mt-6 mb-4;
+}
+
+.rich-text-editor .ProseMirror h2 {
+  @apply text-2xl font-bold mt-5 mb-3;
+}
+
+.rich-text-editor .ProseMirror h3 {
+  @apply text-xl font-bold mt-4 mb-2;
+}
+
+.rich-text-editor .ProseMirror p {
+  @apply mb-4 leading-relaxed;
+}
+
+.rich-text-editor .ProseMirror ul,
+.rich-text-editor .ProseMirror ol {
+  @apply pl-6 mb-4;
+}
+
+.rich-text-editor .ProseMirror li {
+  @apply mb-2;
+}
+
+.rich-text-editor .ProseMirror blockquote {
+  @apply border-l-4 border-gray-300 pl-4 italic my-4;
+}
+
+.rich-text-editor .ProseMirror code {
+  @apply bg-gray-100 rounded px-1 py-0.5 text-sm font-mono;
+}
+
+.rich-text-editor .ProseMirror pre {
+  @apply bg-gray-100 rounded p-4 overflow-x-auto my-4;
+}
+
+.rich-text-editor .ProseMirror pre code {
+  @apply bg-transparent p-0;
+}
